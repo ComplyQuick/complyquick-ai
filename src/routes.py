@@ -1,25 +1,41 @@
 from fastapi import APIRouter, HTTPException
+import logging
+import os
+import tempfile
 
 from src.services import chatbot_service
-from .models import RequestData, ExplanationRequest, ChatbotRequest  # Import models from models.py
+from .models import RequestData, ExplanationRequest, ChatbotRequest, GeneralChatbotRequest, TranscriptionRequest
 from .services.storage_service import StorageService
 from .services.mcq_service import MCQService
 from .services.ppt_explanation import PPTExplanationService 
-from .services.chatbot_service import ChatbotService # Import the new service
+from .services.chatbot_service import ChatbotService
+from .services.general_chatbot_service import GeneralChatbotService
+from .services.transcription_service import TranscriptionService
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 storage_service = StorageService()
 mcq_service = MCQService()
 ppt_explanation_service = PPTExplanationService() 
 chatbot_service = ChatbotService()
+general_chatbot_service = GeneralChatbotService()
+transcription_service = TranscriptionService()
 
 @router.post("/generate_mcq")
 async def generate_mcq(data: RequestData):
     try:
-        content = storage_service.extract_content_from_ppt(data.s3_url)
+        logger.info(f"Received generate_mcq request for presentation: {data.presentation_url}")
+        content = storage_service.extract_content_from_ppt(data.presentation_url)
         mcqs = mcq_service.generate_mcqs(content)
         return {"mcqs": mcqs}
     except Exception as e:
+        logger.error(f"Error in generate_mcq: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/generate_explanations")
@@ -28,14 +44,26 @@ async def generate_explanations(data: ExplanationRequest):
     Generate explanations for each slide in the PowerPoint presentation.
     """
     try:
-        # Download the PPT from the S3 URL
-        ppt_path = storage_service.download_ppt_from_s3(data.s3_url)
+        # Log incoming request
+        logger.info("Received generate_explanations request:")
+        logger.info(f"Presentation URL: {data.presentation_url}")
+        logger.info(f"Company Name: {data.company_name}")
+        logger.info(f"POCs: {[poc.dict() for poc in data.pocs]}")
 
-        # Process the PPT to generate explanations with company name
-        explanations = ppt_explanation_service.process_ppt(ppt_path, data.company_name)
+        # Process the PPT to generate explanations
+        logger.info("Generating explanations...")
+        explanations = ppt_explanation_service.process_ppt(
+            data.presentation_url, 
+            data.company_name,
+            [poc.dict() for poc in data.pocs]  # Convert POC models to dicts
+        )
+        logger.info(f"Generated {len(explanations)} explanations")
 
+        # Log response
+        logger.info("Sending response...")
         return {"explanations": explanations}
     except Exception as e:
+        logger.error(f"Error in generate_explanations: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
     
 
@@ -49,4 +77,57 @@ async def chatbot(data: ChatbotRequest):
         return {"response": response}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/general-chatbot")
+async def general_chatbot(data: GeneralChatbotRequest):
+    """
+    Handle general queries about ComplyQuick and company-specific assigned courses.
+    """
+    try:
+        response = general_chatbot_service.handle_query(data)
+        return {"response": response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/transcribe_audio")
+async def transcribe_audio(data: TranscriptionRequest):
+    """
+    Transcribe audio from a URL using Whisper-1 model
+    """
+    temp_path = None
+    audio_path = None
+    try:
+        logger.info(f"Received transcription request for URL: {data.audio_url}")
+        
+        # Extract file extension from URL
+        file_extension = os.path.splitext(data.audio_url)[1]
+        if not file_extension:
+            raise HTTPException(status_code=400, detail="Audio URL must include a file extension")
+        
+        # Download the audio file
+        audio_path = storage_service.download_presentation(
+            data.audio_url,
+            download_path=f"audio{file_extension}"
+        )
+        
+        if not audio_path or not os.path.exists(audio_path):
+            raise HTTPException(status_code=400, detail="Failed to download audio file")
+        
+        # Transcribe the audio
+        transcription = transcription_service.transcribe_audio(audio_path)
+        return {"transcription": transcription}
+        
+    except ValueError as e:
+        logger.error(f"Validation error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error transcribing audio: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to transcribe audio: {str(e)}")
+    finally:
+        # Clean up temporary files
+        if audio_path and os.path.exists(audio_path):
+            try:
+                os.remove(audio_path)
+            except Exception as e:
+                logger.warning(f"Failed to clean up audio file: {str(e)}")
 

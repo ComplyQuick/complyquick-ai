@@ -19,7 +19,7 @@ class BaseOpenAIService:
         max_response_tokens = 4096 - prompt_tokens
 
         response = self.client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o-mini",  # Using gpt-4o-mini
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}

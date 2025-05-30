@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware  # Import CORSMiddleware
 from src.routes import router
 from dotenv import load_dotenv
 import os
@@ -7,6 +8,15 @@ import os
 load_dotenv()
 
 app = FastAPI()
+
+# Add CORS middleware to allow all origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:7000"],  # Allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods
+    allow_headers=["*"],  # Allow all headers
+)
 
 # Include the router from routes.py
 app.include_router(router)

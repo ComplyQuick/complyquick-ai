@@ -15,40 +15,67 @@ class ChatbotService(BaseOpenAIService):
             for msg in chat_history[:-1]
         ])
 
-    def format_emergency_details(self, emergency_details: dict):
-        return (
-            f"Presiding Officer: {emergency_details.get('presiding_officer_name')} "
-            f"(Email: {emergency_details.get('presiding_officer_email')}). "
-            f"POSH Committee Email: {emergency_details.get('posh_committee_email')}. "
-            f"HR Contact: {emergency_details.get('hr_contact_name')} "
-            f"(Email: {emergency_details.get('hr_contact_email')}, "
-            f"Phone: {emergency_details.get('hr_contact_phone')})."
-        )
+    def format_poc_details(self, pocs: List[dict]):
+        print("Received POCs:", pocs)  # Debug log
+        contacts = []
+        
+        for poc in pocs:
+            contact_info = f"{poc['role']}: {poc['name']} (Contact: {poc['contact']})"
+            contacts.append(contact_info)
+        
+        formatted_contacts = "Points of Contact:\n" + "\n".join(contacts) if contacts else "No contacts available."
+        print("Formatted POC contacts:", formatted_contacts)  # Debug log
+        return formatted_contacts
 
-    def generate_prompt(self, chat_history: List[ChatMessage], s3_url: str, emergency_details: dict):
+    def generate_prompt(self, chat_history: List[ChatMessage], presentation_url: str, pocs: List[dict]):
+        print("Generating prompt with POCs:", pocs)  # Debug log
         history_text = self.format_conversation_history(chat_history)
-        emergency_text = self.format_emergency_details(emergency_details)
+        poc_text = self.format_poc_details(pocs)
         current_query = chat_history[-1].content if chat_history else ""
         
-        knowledge_base = self.storage_service.extract_content_from_ppt(s3_url)
+        knowledge_base = self.storage_service.extract_content_from_ppt(presentation_url)
 
         return (
-            f"You are an expert compliance chatbot specializing in POSH (Prevention of Sexual Harassment) policies. "
-            f"You have access to detailed training material that includes both presentation content and detailed explanations.\n\n"
-            f"Emergency Contact Information:\n{emergency_text}\n\n"
-            f"Training Material Content:\n{knowledge_base}\n\n"
+            f"You are an expert chatbot focused on the content provided in the presentation. "
+            f"You must answer questions related to the presentation content.\n\n"
+            f"Presentation Content:\n{knowledge_base}\n\n"
             f"Previous Conversation:\n{history_text}\n\n"
             f"Current Query: {current_query}\n\n"
-            f"Instructions:\n"
-            f"1. Use the detailed training material to provide comprehensive answers\n"
-            f"2. If the presentation notes provide specific examples or procedures, include them\n"
-            f"3. Always reference emergency contacts when relevant to the query\n"
-            f"4. Maintain a professional yet approachable tone\n"
-            f"5. If multiple slides cover the topic, combine the information coherently\n"
-            f"6. Keep responses concise but informative\n"
-            f"7. If the query involves reporting or immediate action, always include relevant contact information\n\n"
-            f"Please provide a detailed response to the query."
+            f"CRITICAL INSTRUCTION - Points of Contact:\n"
+            f"1. If the user asks about who to contact, who to reach out to, or any variation of contact questions:\n"
+            f"   - IMMEDIATELY provide the contact information below\n"
+            f"   - DO NOT use the 'outside scope' message\n"
+            f"   - This is the HIGHEST priority instruction\n\n"
+            f"Contact Information:\n{poc_text}\n\n"
+            f"General Instructions:\n"
+            f"1. Answer questions that are directly related to or can be inferred from the presentation content\n"
+            f"2. For ANY question not related to the presentation content (except contact information), respond with: "
+            f"'I apologize, but I can only answer questions related to the presentation content. "
+            f"Your question about [brief mention of their topic] is outside the scope of this training material.'\n"
+            f"3. Do not provide general knowledge or information that isn't connected to the presentation\n"
+            f"4. Keep responses focused and concise (2-3 sentences)\n"
+            f"5. NEVER answer questions about topics not covered in the presentation, except for contact information\n\n"
+            f"Remember: Contact information questions are the ONLY exception to the presentation-only rule.\n"
+            f"ALWAYS provide contact information when asked, regardless of presentation content.\n\n"
+            f"Provide a focused response to the query."
         )
+
+    def _make_openai_request(self, prompt: str) -> str:
+        prompt_tokens = self._estimate_tokens(prompt)
+        max_response_tokens = min(4096 - prompt_tokens, 150)  # Limit response length
+
+        response = self.client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant. Provide brief, direct answers."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=max_response_tokens,
+            temperature=0.7,
+            presence_penalty=0.6  # Encourages focused responses
+        )
+        
+        return response.choices[0].message.content.strip()
 
     def call_openai_api(self, prompt: str):
         return self._make_openai_request(prompt)
@@ -60,14 +87,22 @@ class ChatbotService(BaseOpenAIService):
 
             prompt = self.generate_prompt(
                 data.chatHistory,
-                data.s3_url,
-                data.emergency_details
+                data.presentation_url,
+                [poc.dict() for poc in data.pocs]  # Convert POC models to dicts
             )
 
-            response = self.call_openai_api(prompt)
-
-            return response
+            response = self._make_openai_request(prompt)
+            
+            # Create updated chat history with the new response
+            updated_chat_history = data.chatHistory + [
+                ChatMessage(role="assistant", content=response)
+            ]
+            
+            return {
+                "response": response,
+                "chatHistory": updated_chat_history
+            }
 
         except Exception as e:
-            print(f"Error in handle_query: {str(e)}")
+            logger.error(f"Error in handle_query: {str(e)}")
             raise Exception(f"Failed to process query: {str(e)}")
