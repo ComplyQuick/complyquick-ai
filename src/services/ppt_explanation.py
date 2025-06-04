@@ -189,10 +189,10 @@ class PPTExplanationService(BaseOpenAIService):
                     gist_prompt = (
                         f"Create a very concise title (4-6 words) for the following slide content. "
                         f"Focus on the main topic only:\n\n"
-                        f"{slides_content[i]}"
-                    )
-                    gist = self._make_openai_request(gist_prompt)
-                    cleaned_gist = gist.strip().replace('"', '').replace("'", '')
+                    f"{slides_content[i]}"
+                )
+                gist = self._make_openai_request(gist_prompt)
+                cleaned_gist = gist.strip().replace('"', '').replace("'", '')
                 
                 result.append(
                     SlideExplanation(

@@ -49,14 +49,17 @@ class ChatbotService(BaseOpenAIService):
             f"Contact Information:\n{poc_text}\n\n"
             f"General Instructions:\n"
             f"1. Answer questions that are directly related to or can be inferred from the presentation content\n"
-            f"2. For ANY question not related to the presentation content (except contact information), respond with: "
-            f"'I apologize, but I can only answer questions related to the presentation content. "
-            f"Your question about [brief mention of their topic] is outside the scope of this training material.'\n"
-            f"3. Do not provide general knowledge or information that isn't connected to the presentation\n"
-            f"4. Keep responses focused and concise (2-3 sentences)\n"
-            f"5. NEVER answer questions about topics not covered in the presentation, except for contact information\n\n"
-            f"Remember: Contact information questions are the ONLY exception to the presentation-only rule.\n"
-            f"ALWAYS provide contact information when asked, regardless of presentation content.\n\n"
+            f"2. For questions about scenarios or situations not explicitly covered in the content:\n"
+            f"   - If the question is relevant to the course topic, provide a helpful response based on the principles and concepts from the content\n"
+            f"   - Use your understanding of the course material to provide guidance\n"
+            f"   - Only respond with 'outside scope' if the question is completely unrelated to the course topic\n"
+            f"3. Keep responses focused and concise (2-3 sentences)\n"
+            f"4. When providing guidance for scenarios not explicitly covered:\n"
+            f"   - Reference relevant principles from the course content\n"
+            f"   - Explain how these principles apply to the user's situation\n"
+            f"   - Provide practical advice based on the course's teachings\n\n"
+            f"Remember: Your goal is to be helpful and provide value to the user's learning experience.\n"
+            f"Only use 'outside scope' for questions completely unrelated to the course topic.\n\n"
             f"Provide a focused response to the query."
         )
 
@@ -84,7 +87,6 @@ class ChatbotService(BaseOpenAIService):
         try:
             if not data.chatHistory:
                 raise ValueError("Chat history cannot be empty")
-
             prompt = self.generate_prompt(
                 data.chatHistory,
                 data.presentation_url,

@@ -7,7 +7,11 @@ class GeneralChatbotService(BaseOpenAIService):
         return (
             f"Company Information:\n"
             f"Company Name: {company_name}\n"
-            f"Website: ComplyQuick - A compliance training platform\n"
+            f"Website: ComplyQuick - A compliance training platform\n\n"
+            f"Contact Information:\n"
+            f"CEO: {tenant_details.ceoName} (Email: {tenant_details.ceoEmail}, Phone: {tenant_details.ceoContact})\n"
+            f"CTO: {tenant_details.ctoName} (Email: {tenant_details.ctoEmail}, Phone: {tenant_details.ctoContact})\n"
+            f"HR: {tenant_details.hrContactName} (Email: {tenant_details.hrContactEmail}, Phone: {tenant_details.hrContactPhone})\n"
         )
 
     def format_assigned_courses(self, courses: List[CourseInfo]) -> str:
@@ -54,15 +58,27 @@ class GeneralChatbotService(BaseOpenAIService):
             f"   - Content clarifications\n\n"
             f"The platform is structured to ensure compliance readiness, clarity in learning, and efficient support through intelligent chatbot interaction.\n\n"
             f"Instructions for responding:\n"
-            f"1. When someone asks for contact information, ALWAYS provide the specific email and phone number\n"
-            f"2. Be direct and provide the exact contact details requested\n"
-            f"3. For technical issues, provide CTO contact information\n"
-            f"4. For HR related queries, provide HR contact details\n"
-            f"5. Keep responses professional but friendly\n"
-            f"6. Include relevant contact information in every response where applicable\n"
-            f"7. When asked about courses, refer to the assigned courses list above\n"
-            f"8. For course-specific questions, direct users to use the course-specific chatbot\n"
-            f"9. For platform-related questions, provide clear and concise information\n\n"
+            f"1. When someone asks about company leadership or contact information:\n"
+            f"   - ALWAYS provide the specific information from the company details above\n"
+            f"   - For CEO questions, provide the CEO's name, email, and phone\n"
+            f"   - For CTO questions, provide the CTO's name, email, and phone\n"
+            f"   - For HR questions, provide the HR contact's name, email, and phone\n"
+            f"2. For ANY questions or scenarios related to compliance topics:\n"
+            f"   - DO NOT provide direct advice or answers\n"
+            f"   - ALWAYS redirect to the appropriate course-specific chatbot\n"
+            f"   - This includes:\n"
+            f"     * Direct questions about compliance topics (POSH, ISO, SOC2, etc.)\n"
+            f"     * Workplace scenarios that might involve compliance issues\n"
+            f"     * Situations that could be related to harassment, discrimination, or workplace conduct\n"
+            f"     * Questions about company policies or procedures\n"
+            f"   - For POSH-related scenarios (like manager behavior, workplace conduct, etc.), respond with:\n"
+            f"     'I notice your question involves workplace conduct and behavior. For the most accurate guidance on handling this situation, I'd recommend using the dedicated chatbot in our [course name] course. You can find it by clicking on the [course name] course above. This will ensure you get the most relevant and up-to-date guidance on handling workplace situations.'\n"
+            f"3. Be direct and provide the exact contact details requested\n"
+            f"4. For technical issues, provide CTO contact information\n"
+            f"5. For HR related queries, provide HR contact details\n"
+            f"6. Keep responses professional but friendly\n"
+            f"7. Include relevant contact information in every response where applicable\n"
+            f"8. For platform-related questions, provide clear and concise information\n\n"
             f"Chat History:\n{history_text}\n\n"
             f"Current Query: {current_query}\n\n"
             f"Provide a helpful response with specific contact details when relevant."
@@ -70,6 +86,18 @@ class GeneralChatbotService(BaseOpenAIService):
 
     def handle_query(self, request_data: GeneralChatbotRequest) -> dict:
         try:
+            # Print request data
+            print("\n=== General Chatbot Request Data ===")
+            print(f"Company Name: {request_data.company_name}")
+            print(f"Tenant Details: {request_data.tenant_details}")
+            print("\nAssigned Courses:")
+            for course in request_data.assigned_courses:
+                print(f"- {course.name}: {course.description}")
+            print("\nChat History:")
+            for msg in request_data.chatHistory:
+                print(f"{msg.role.upper()}: {msg.content}")
+            print("================================\n")
+
             prompt = self.generate_prompt(
                 request_data.chatHistory,
                 request_data.company_name,
