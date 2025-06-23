@@ -3,6 +3,9 @@ from typing import List
 from ..models import ChatbotRequest, ChatMessage
 from .base_openai_service import BaseOpenAIService
 from .storage_service import StorageService
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ChatbotService(BaseOpenAIService):
     def __init__(self):
