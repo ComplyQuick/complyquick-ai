@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  complyquick-ai:
+    build: .
+    container_name: complyquick-ai
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./downloads:/app/downloads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - complyquick-network
+
+  # Optional: Add a reverse proxy with nginx for production
+  nginx:
+    image: nginx:alpine
+    container_name: complyquick-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - complyquick-ai
+    restart: unless-stopped
+    networks:
+      - complyquick-network
+    profiles:
+      - production
+
+networks:
+  complyquick-network:
+    driver: bridge
+
+volumes:
+  uploads:
+  downloads:

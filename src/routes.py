@@ -37,6 +37,46 @@ transcription_service = TranscriptionService()
 slide_enhancement_service = SlideEnhancementService()
 bulk_enhancement_service = BulkEnhancementService()
 
+@router.get("/health")
+async def health_check():
+    """
+    Health check endpoint for Docker and load balancers.
+    """
+    try:
+        # Basic health check - you can add more sophisticated checks here
+        return {
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "service": "complyquick-ai",
+            "version": "1.0.0"
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        raise HTTPException(status_code=503, detail="Service unhealthy")
+
+@router.get("/")
+async def root():
+    """
+    Root endpoint with service information.
+    """
+    return {
+        "message": "ComplyQuick AI Service",
+        "version": "1.0.0",
+        "status": "running",
+        "endpoints": {
+            "health": "/health",
+            "generate_mcq": "/generate_mcq",
+            "generate_explanations": "/generate_explanations",
+            "chatbot": "/chatbot",
+            "general_chatbot": "/general-chatbot",
+            "transcribe_audio": "/transcribe_audio",
+            "enhance_slide": "/enhance-slide",
+            "enhance_all_slides": "/enhance-all-slides",
+            "get_enhancement_suggestions": "/get-enhancement-suggestions",
+            "compare_enhancements": "/compare-enhancements"
+        }
+    }
+
 @router.post("/generate_mcq")
 async def generate_mcq(data: RequestData):
     try:

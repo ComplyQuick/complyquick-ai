@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  complyquick-ai:
+    environment:
+      - ENVIRONMENT=development
+      - PYTHONPATH=/app
+    volumes:
+      - .:/app
+      - /app/__pycache__
+      - /app/.pytest_cache
+    ports:
+      - "8000:8000"
+    command:
+      ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
