@@ -70,13 +70,18 @@ class SlideEnhancementService(BaseOpenAIService):
             Please enhance ONLY the explanation for slide {explanation_array[query_index]['slide']} based on this request:
             {query_prompt}
 
-            Important guidelines:
+            CRITICAL INSTRUCTIONS:
             1. Consider the full context of all slides while making the enhancement
             2. Maintain consistency with the overall presentation
             3. Ensure the enhanced explanation flows naturally with other slides
             4. Return only the enhanced explanation for the specified slide
             5. Do not modify any other slides' explanations
             6. Do not include any prefixes like 'Explanation:' in your response
+            7. REPLACE AND ENHANCE: Create a completely new explanation that conveys all the original information but with improved delivery
+            8. PRESERVE ALL INFORMATION: Ensure every fact, detail, number, and point from the original explanation is included
+            9. IMPROVE DELIVERY: Use the enhancement request to make the explanation more engaging, clear, or appropriate for the target audience
+            10. NATURAL FLOW: Make the explanation feel conversational and interesting while maintaining all original content
+            11. AVOID REDUNDANCY: Do not repeat the original explanation - create a fresh, enhanced version that covers everything
             """
 
             # Get enhanced explanation from OpenAI

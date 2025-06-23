@@ -79,16 +79,18 @@ class BulkEnhancementService(BaseOpenAIService):
                 8. Start directly with the first enhanced explanation
                 9. End with the last enhanced explanation
                 10. Do not add any summary, conclusion, or additional text after the explanations
-                11. PRESERVE ALL ORIGINAL INFORMATION: Do not condense, summarize, or remove any information from the original explanations unless the enhancement request specifically asks for it
-                12. ENHANCE, DON'T REDUCE: Add the requested enhancements while keeping all existing content intact
-                13. COMPREHENSIVE COVERAGE: Ensure every point, detail, and piece of information from the original explanation is included in the enhanced version
+                11. REPLACE AND ENHANCE: Create completely new explanations that convey all the original information but with improved delivery
+                12. PRESERVE ALL INFORMATION: Ensure every fact, detail, number, and point from the original explanation is included
+                13. IMPROVE DELIVERY: Use the enhancement request to make the explanation more engaging, clear, or appropriate for the target audience
+                14. NATURAL FLOW: Make the explanation feel conversational and interesting while maintaining all original content
+                15. AVOID REDUNDANCY: Do not repeat the original explanation - create a fresh, enhanced version that covers everything
 
                 Expected format:
-                [First enhanced explanation with ALL original information preserved plus enhancements]
+                [First enhanced explanation that replaces the original with better delivery]
 
-                [Second enhanced explanation with ALL original information preserved plus enhancements]
+                [Second enhanced explanation that replaces the original with better delivery]
 
-                [Third enhanced explanation with ALL original information preserved plus enhancements]
+                [Third enhanced explanation that replaces the original with better delivery]
                 (and so on for exactly {len(batch)} explanations)
                 """
 
@@ -157,6 +159,14 @@ class BulkEnhancementService(BaseOpenAIService):
 
             Please enhance the explanation based on this request:
             {query_prompt}
+
+            CRITICAL INSTRUCTIONS:
+            1. Create a completely new explanation that replaces the original
+            2. Preserve ALL information from the original explanation
+            3. Improve the delivery based on the enhancement request
+            4. Make it more engaging and natural while keeping all facts intact
+            5. Do not add the original explanation on top - create a fresh, enhanced version
+            6. Ensure the explanation flows well and is appropriate for the target audience
             """
 
             if enhancement_type:

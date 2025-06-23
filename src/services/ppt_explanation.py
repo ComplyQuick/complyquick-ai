@@ -405,15 +405,12 @@ class PPTExplanationService(BaseOpenAIService):
             
             # Step 4: Verify content coverage and regenerate if needed
             logger.debug(f"Verifying content coverage for slide {index + 1}")
-            # Use semantic verification only
             verification_enabled = True
             
             if verification_enabled:
                 try:
-                    # Use semantic verification only
                     if not self._semantic_verify_content_coverage(slide_text, cleaned_explanation):
                         logger.warning(f"Content coverage insufficient for slide {index + 1}, regenerating...")
-                        # Create a more specific prompt for better coverage
                         enhanced_prompt = (
                             f"CRITICAL: The previous explanation missed some content. "
                             f"Please create a COMPLETE explanation that covers EVERY single point from this slide content. "
@@ -441,17 +438,16 @@ class PPTExplanationService(BaseOpenAIService):
                             .replace("-", "")
                             .replace("...", ".")
                             .replace("\n\n", " ")
-                            .replace("**", "")  # Remove double asterisks to prevent double highlighting
+                            .replace("**", "")
                             .strip())
                 except Exception as verification_error:
                     logger.warning(f"Content verification failed for slide {index + 1}, continuing with original explanation: {str(verification_error)}")
-                    # Continue with the original explanation if verification fails
-                
-                logger.debug(f"Generated explanation for slide {index + 1}: {cleaned_explanation[:200]}...")
+            
+            logger.debug(f"Generated explanation for slide {index + 1}: {cleaned_explanation[:200]}...")
             return index, cleaned_explanation
             
-            except Exception as e:
-                logger.error(f"Error processing slide {index + 1}: {str(e)}", exc_info=True)
+        except Exception as e:
+            logger.error(f"Error processing slide {index + 1}: {str(e)}", exc_info=True)
             return index, f"Error generating explanation: {str(e)}"
 
     def generate_explanations(self, slides_content: list, company_name: str, pocs: list):
