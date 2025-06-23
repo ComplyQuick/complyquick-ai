@@ -10,10 +10,24 @@ class ChatbotService(BaseOpenAIService):
         self.storage_service = StorageService()
 
     def format_conversation_history(self, chat_history: List[ChatMessage]):
-        return "\n".join([
-            f"{'User' if msg.role == 'user' else 'Assistant'}: {msg.content}" 
-            for msg in chat_history[:-1]
-        ])
+        """
+        Format conversation history with better context awareness and structure.
+        """
+        formatted_history = []
+        for i, msg in enumerate(chat_history[:-1]):  # Exclude the current query
+            # Add context markers for better understanding
+            if i == 0:
+                formatted_history.append("=== Conversation Start ===")
+            
+            # Format the message with role and content
+            formatted_msg = f"{'User' if msg.role == 'user' else 'Assistant'}: {msg.content}"
+            formatted_history.append(formatted_msg)
+            
+            # Add context about the flow of conversation
+            if i < len(chat_history) - 2:  # Don't add after the last message
+                formatted_history.append("---")
+        
+        return "\n".join(formatted_history)
 
     def format_poc_details(self, pocs: List[dict]):
         print("Received POCs:", pocs)  # Debug log
@@ -36,31 +50,48 @@ class ChatbotService(BaseOpenAIService):
         knowledge_base = self.storage_service.extract_content_from_ppt(presentation_url)
 
         return (
-            f"You are an expert chatbot focused on the content provided in the presentation. "
-            f"You must answer questions related to the presentation content.\n\n"
+            f"You are a friendly and knowledgeable guide helping someone understand the presentation content. "
+            f"Think of yourself as a friend explaining concepts to another friend - be warm, conversational, and engaging.\n\n"
             f"Presentation Content:\n{knowledge_base}\n\n"
-            f"Previous Conversation:\n{history_text}\n\n"
+            f"CONVERSATION CONTEXT:\n"
+            f"The following is the conversation history. Use this to understand the context and flow of the discussion:\n"
+            f"{history_text}\n\n"
             f"Current Query: {current_query}\n\n"
-            f"CRITICAL INSTRUCTION - Points of Contact:\n"
-            f"1. If the user asks about who to contact, who to reach out to, or any variation of contact questions:\n"
-            f"   - IMMEDIATELY provide the contact information below\n"
-            f"   - DO NOT use the 'outside scope' message\n"
-            f"   - This is the HIGHEST priority instruction\n\n"
+            f"RESPONSE GUIDELINES:\n"
+            f"1. CONVERSATIONAL TONE:\n"
+            f"   - Use a warm, friendly tone like you're explaining to a friend\n"
+            f"   - Avoid formal or technical language unless necessary\n"
+            f"   - Use everyday examples and relatable scenarios\n"
+            f"   - Feel free to use casual language while maintaining professionalism\n\n"
+            f"2. CONTENT EXPLANATION:\n"
+            f"   - Explain concepts in your own words, not just repeating the presentation\n"
+            f"   - Use real-world examples that make the content more relatable\n"
+            f"   - Break down complex ideas into simpler terms\n"
+            f"   - Share examples that help illustrate the points\n\n"
+            f"3. EXAMPLE HANDLING:\n"
+            f"   - Provide relatable examples that make the content more understandable\n"
+            f"   - Use scenarios that people can easily relate to\n"
+            f"   - Make examples practical and relevant to everyday situations\n"
+            f"   - Keep examples appropriate and professional\n\n"
+            f"4. SCOPE AND RELEVANCE:\n"
+            f"   - Questions about the presentation's main topics are IN SCOPE\n"
+            f"   - Questions asking for examples or clarification are IN SCOPE\n"
+            f"   - Questions about how to apply the concepts are IN SCOPE\n"
+            f"   - Only respond 'outside scope' for questions completely unrelated to the presentation topics\n\n"
+            f"5. CONTACT INFORMATION (HIGHEST PRIORITY):\n"
+            f"   - If the user asks about who to contact or any variation of contact questions:\n"
+            f"   - IMMEDIATELY provide ONLY the contact information below\n"
+            f"   - DO NOT add any additional information\n\n"
             f"Contact Information:\n{poc_text}\n\n"
-            f"General Instructions:\n"
-            f"1. Answer questions that are directly related to or can be inferred from the presentation content\n"
-            f"2. For questions about scenarios or situations not explicitly covered in the content:\n"
-            f"   - If the question is relevant to the course topic, provide a helpful response based on the principles and concepts from the content\n"
-            f"   - Use your understanding of the course material to provide guidance\n"
-            f"   - Only respond with 'outside scope' if the question is completely unrelated to the course topic\n"
-            f"3. Keep responses focused and concise (2-3 sentences)\n"
-            f"4. When providing guidance for scenarios not explicitly covered:\n"
-            f"   - Reference relevant principles from the course content\n"
-            f"   - Explain how these principles apply to the user's situation\n"
-            f"   - Provide practical advice based on the course's teachings\n\n"
-            f"Remember: Your goal is to be helpful and provide value to the user's learning experience.\n"
-            f"Only use 'outside scope' for questions completely unrelated to the course topic.\n\n"
-            f"Provide a focused response to the query."
+            f"6. RESPONSE FORMAT:\n"
+            f"   - Keep responses concise but friendly (2-3 sentences)\n"
+            f"   - Use a conversational, approachable tone\n"
+            f"   - Make explanations feel natural and easy to understand\n"
+            f"   - Maintain the friendly context while staying relevant to the presentation\n\n"
+            f"Remember: You're a friend helping another friend understand the presentation content.\n"
+            f"Be warm, conversational, and make the content relatable through examples and explanations.\n"
+            f"Only use 'outside scope' for questions completely unrelated to the presentation's main topics.\n\n"
+            f"Provide a friendly, helpful response to the query."
         )
 
     def _make_openai_request(self, prompt: str) -> str:

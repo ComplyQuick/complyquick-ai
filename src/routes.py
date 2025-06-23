@@ -1,16 +1,22 @@
 from fastapi import APIRouter, HTTPException
 import logging
 import os
-import tempfile
+from datetime import datetime
 
 from src.services import chatbot_service
-from .models import RequestData, ExplanationRequest, ChatbotRequest, GeneralChatbotRequest, TranscriptionRequest
+from .models import (
+    RequestData, ExplanationRequest, ChatbotRequest, GeneralChatbotRequest,
+    TranscriptionRequest, SlideEnhancementRequest, EnhancementResponse,
+    BulkEnhancementRequest, EnhancementComparison
+)
 from .services.storage_service import StorageService
 from .services.mcq_service import MCQService
 from .services.ppt_explanation import PPTExplanationService 
 from .services.chatbot_service import ChatbotService
 from .services.general_chatbot_service import GeneralChatbotService
 from .services.transcription_service import TranscriptionService
+from .services.slide_enhancement_service import SlideEnhancementService
+from .services.bulk_enhancement_service import BulkEnhancementService
 
 # Configure logging
 logging.basicConfig(
@@ -26,6 +32,10 @@ ppt_explanation_service = PPTExplanationService()
 chatbot_service = ChatbotService()
 general_chatbot_service = GeneralChatbotService()
 transcription_service = TranscriptionService()
+
+# Initialize enhancement services
+slide_enhancement_service = SlideEnhancementService()
+bulk_enhancement_service = BulkEnhancementService()
 
 @router.post("/generate_mcq")
 async def generate_mcq(data: RequestData):
@@ -94,7 +104,6 @@ async def transcribe_audio(data: TranscriptionRequest):
     """
     Transcribe audio from a URL using Whisper-1 model
     """
-    temp_path = None
     audio_path = None
     try:
         logger.info(f"Received transcription request for URL: {data.audio_url}")
@@ -130,4 +139,88 @@ async def transcribe_audio(data: TranscriptionRequest):
                 os.remove(audio_path)
             except Exception as e:
                 logger.warning(f"Failed to clean up audio file: {str(e)}")
+
+@router.post("/enhance-slide", response_model=EnhancementResponse)
+async def enhance_slide(request: SlideEnhancementRequest):
+    """Enhance a specific slide's explanation."""
+    try:
+        logger.info(f"Received enhance-slide request for slide index: {request.query_index}")
+        
+        # Convert Pydantic models to dictionaries
+        explanation_array = [item.model_dump() for item in request.explanation_array]
+        
+        result = await slide_enhancement_service.enhance_specific_slides(
+            explanation_array=explanation_array,
+            query_index=request.query_index,
+            query_prompt=request.query_prompt
+        )
+        return EnhancementResponse(explanation_array=result['explanation_array'])
+    except Exception as e:
+        logger.error(f"Error in enhance-slide: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/enhance-all-slides", response_model=EnhancementResponse)
+async def enhance_all_slides(request: BulkEnhancementRequest):
+    """Enhance all slides' explanations."""
+    try:
+        logger.info("Received enhance-all-slides request")
+        
+        # Convert Pydantic models to dictionaries
+        explanation_array = [item.model_dump() for item in request.explanation_array]
+        
+        result = await bulk_enhancement_service.enhance_all_slides(
+            explanation_array=explanation_array,
+            query_prompt=request.query_prompt,
+            batch_size=request.batch_size
+        )
+        return EnhancementResponse(explanation_array=result['explanation_array'])
+    except Exception as e:
+        logger.error(f"Error in enhance-all-slides: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/get-enhancement-suggestions")
+async def get_enhancement_suggestions(data: SlideEnhancementRequest):
+    """
+    Get suggestions for enhancing a specific slide.
+    """
+    try:
+        logger.info(f"Received get-enhancement-suggestions request for slide index: {data.query_index}")
+        
+        suggestions = await slide_enhancement_service.get_enhancement_suggestions(
+            explanation_array=data.explanation_array,
+            query_index=data.query_index
+        )
+        
+        return {"suggestions": suggestions}
+    except Exception as e:
+        logger.error(f"Error in get-enhancement-suggestions: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/compare-enhancements", response_model=EnhancementComparison)
+async def compare_enhancements(data: SlideEnhancementRequest):
+    """
+    Compare original and enhanced explanations for a slide.
+    """
+    try:
+        logger.info(f"Received compare-enhancements request for slide index: {data.query_index}")
+        
+        original = data.explanation_array[data.query_index]['explanation']
+        enhanced = await slide_enhancement_service.enhance_specific_slides(
+            explanation_array=data.explanation_array,
+            query_index=data.query_index,
+            query_prompt=data.query_prompt
+        )
+        
+        comparison = await slide_enhancement_service.compare_enhancements(
+            original_explanation=original,
+            enhanced_explanation=enhanced['explanation_array'][data.query_index]['explanation']
+        )
+        
+        return EnhancementComparison(
+            **comparison['comparison'],
+            timestamp=datetime.now()
+        )
+    except Exception as e:
+        logger.error(f"Error in compare-enhancements: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 

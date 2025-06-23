@@ -1,5 +1,6 @@
 from typing import List, Optional, Union
 from pydantic import BaseModel, Field
+from datetime import datetime
 
 # API Request/Response Models
 class GeminiPart(BaseModel):
@@ -82,8 +83,26 @@ class TranscriptionRequest(BaseModel):
     """Model for audio transcription requests"""
     audio_url: str  # URL to the audio file
 
-# API Configuration Constants
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-API_HEADERS = {
-    "Content-Type": "application/json"
-}
+class SlideEnhancementRequest(BaseModel):
+    """Model for slide enhancement requests"""
+    explanation_array: List[SlideExplanation]
+    query_index: int
+    query_prompt: Optional[str] = None
+
+class EnhancementResponse(BaseModel):
+    """Model for enhancement responses"""
+    explanation_array: List[SlideExplanation]
+
+class BulkEnhancementRequest(BaseModel):
+    """Model for bulk enhancement requests"""
+    explanation_array: List[SlideExplanation]
+    query_prompt: str
+    batch_size: int = 5
+
+class EnhancementComparison(BaseModel):
+    """Model for enhancement comparisons"""
+    original_length: int
+    enhanced_length: int
+    similarity_score: float
+    key_differences: List[str]
+    timestamp: datetime
