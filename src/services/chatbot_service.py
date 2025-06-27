@@ -76,11 +76,13 @@ class ChatbotService(BaseOpenAIService):
             f"   - Use scenarios that people can easily relate to\n"
             f"   - Make examples practical and relevant to everyday situations\n"
             f"   - Keep examples appropriate and professional\n\n"
-            f"4. SCOPE AND RELEVANCE:\n"
+            f"4. SCOPE AND RELEVANCE (CRITICAL):\n"
+            f"   - ONLY answer questions that are directly related to the presentation content\n"
             f"   - Questions about the presentation's main topics are IN SCOPE\n"
-            f"   - Questions asking for examples or clarification are IN SCOPE\n"
-            f"   - Questions about how to apply the concepts are IN SCOPE\n"
-            f"   - Only respond 'outside scope' for questions completely unrelated to the presentation topics\n\n"
+            f"   - Questions asking for examples or clarification about presentation topics are IN SCOPE\n"
+            f"   - Questions about how to apply the presentation concepts are IN SCOPE\n"
+            f"   - Questions completely unrelated to the presentation (math problems, general advice, unrelated topics) are OUT OF SCOPE\n"
+            f"   - For OUT OF SCOPE questions, respond with: 'I'm here to help with questions about the presentation content. Could you please ask something related to the topics covered in the presentation?'\n\n"
             f"5. CONTACT INFORMATION (HIGHEST PRIORITY):\n"
             f"   - If the user asks about who to contact or any variation of contact questions:\n"
             f"   - IMMEDIATELY provide ONLY the contact information below\n"
@@ -92,14 +94,16 @@ class ChatbotService(BaseOpenAIService):
             f"   - Make explanations feel natural and easy to understand\n"
             f"   - Maintain the friendly context while staying relevant to the presentation\n\n"
             f"Remember: You're a friend helping another friend understand the presentation content.\n"
-            f"Be warm, conversational, and make the content relatable through examples and explanations.\n"
-            f"Only use 'outside scope' for questions completely unrelated to the presentation's main topics.\n\n"
+            f"Be warm, conversational, and make the content relatable through examples and explanations.\n\n"
+            f"CRITICAL: Before responding, check if the question is related to the presentation content:\n"
+            f"- If the question is about the presentation topics, provide a helpful response\n"
+            f"- If the question is completely unrelated (math problems, general life advice, etc.), use the exact response: 'I'm here to help with questions about the presentation content. Could you please ask something related to the topics covered in the presentation?'\n\n"
             f"Provide a friendly, helpful response to the query."
         )
 
     def _make_openai_request(self, prompt: str) -> str:
         prompt_tokens = self._estimate_tokens(prompt)
-        max_response_tokens = min(4096 - prompt_tokens, 150)  # Limit response length
+        max_response_tokens = min(4096 - prompt_tokens, 150)  
 
         response = self.client.chat.completions.create(
             model="gpt-4o-mini",
@@ -117,17 +121,55 @@ class ChatbotService(BaseOpenAIService):
     def call_openai_api(self, prompt: str):
         return self._make_openai_request(prompt)
 
+    def _is_clearly_unrelated_question(self, question: str) -> bool:
+        """
+        Check if a question is clearly unrelated to presentation content.
+        This helps avoid unnecessary API calls for obvious off-topic questions.
+        """
+        question_lower = question.lower().strip()
+        
+        # Common patterns for unrelated questions
+        unrelated_patterns = [
+            # Math problems
+            r'^\d+[\+\-\*\/]\d+',  # e.g., "2+2", "5*3"
+            r'what is \d+[\+\-\*\/]\d+',  # e.g., "what is 2+2"
+            
+            # General life advice
+            r'can i (cheat|steal|lie)',
+            r'how to (cheat|steal)',
+            r'should i (cheat|steal|lie)',
+            
+            # Weather, time, personal questions
+            r'what.*weather',
+            r'what.*time',
+            r'how old are you',
+            r'what.*your name',
+        ]
+        
+        import re
+        for pattern in unrelated_patterns:
+            if re.search(pattern, question_lower):
+                return True
+        
+        return False
+
     def handle_query(self, data: ChatbotRequest):
         try:
             if not data.chatHistory:
                 raise ValueError("Chat history cannot be empty")
-            prompt = self.generate_prompt(
-                data.chatHistory,
-                data.presentation_url,
-                [poc.dict() for poc in data.pocs]  # Convert POC models to dicts
-            )
-
-            response = self._make_openai_request(prompt)
+            
+            current_question = data.chatHistory[-1].content if data.chatHistory else ""
+            
+            # Quick check for obviously unrelated questions
+            if self._is_clearly_unrelated_question(current_question):
+                response = "I'm here to help with questions about the presentation content. Could you please ask something related to the topics covered in the presentation?"
+            else:
+                prompt = self.generate_prompt(
+                    data.chatHistory,
+                    data.presentation_url,
+                    [poc.dict() for poc in data.pocs]  # Convert POC models to dicts
+                )
+                response = self._make_openai_request(prompt)
             
             # Create updated chat history with the new response
             updated_chat_history = data.chatHistory + [

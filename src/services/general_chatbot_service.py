@@ -57,6 +57,16 @@ class GeneralChatbotService(BaseOpenAIService):
             f"   - Course-specific doubts\n"
             f"   - Content clarifications\n\n"
             f"The platform is structured to ensure compliance readiness, clarity in learning, and efficient support through intelligent chatbot interaction.\n\n"
+            f"SCOPE AND RESTRICTIONS (CRITICAL):\n"
+            f"ONLY answer questions that are directly related to:\n"
+            f"- ComplyQuick platform functionality and navigation\n"
+            f"- Company information and contact details\n"
+            f"- Course assignments and completion requirements\n"
+            f"- Certification processes and timelines\n"
+            f"- Platform technical issues\n"
+            f"- Account access and usage\n\n"
+            f"For questions completely unrelated to ComplyQuick or compliance training (math problems, general life advice, weather, etc.), respond with:\n"
+            f"'I'm here to help with questions about the ComplyQuick platform and your assigned courses. Could you please ask something related to your compliance training or platform usage?'\n\n"
             f"Instructions for responding:\n"
             f"1. When someone asks about company leadership or contact information:\n"
             f"   - ALWAYS provide the specific information from the company details above\n"
@@ -79,10 +89,56 @@ class GeneralChatbotService(BaseOpenAIService):
             f"6. Keep responses professional but friendly\n"
             f"7. Include relevant contact information in every response where applicable\n"
             f"8. For platform-related questions, provide clear and concise information\n\n"
+            f"CRITICAL: Before responding, check if the question is related to ComplyQuick platform or compliance training:\n"
+            f"- If YES: Provide helpful response following the guidelines above\n"
+            f"- If NO: Use the exact out-of-scope response provided above\n\n"
             f"Chat History:\n{history_text}\n\n"
             f"Current Query: {current_query}\n\n"
             f"Provide a helpful response with specific contact details when relevant."
         )
+
+    def _is_clearly_unrelated_question(self, question: str) -> bool:
+        """
+        Check if a question is clearly unrelated to ComplyQuick platform or compliance training.
+        This helps avoid unnecessary API calls for obvious off-topic questions.
+        """
+        question_lower = question.lower().strip()
+        
+        # Common patterns for unrelated questions
+        unrelated_patterns = [
+            # Math problems
+            r'^\d+[\+\-\*\/]\d+',  # e.g., "2+2", "5*3"
+            r'what is \d+[\+\-\*\/]\d+',  # e.g., "what is 2+2"
+            
+            # General life advice unrelated to compliance
+            r'can i (cheat|steal|lie)',
+            r'how to (cheat|steal)',
+            r'should i (cheat|steal|lie)',
+            
+            # Weather, time, personal questions
+            r'what.*weather',
+            r'what.*time',
+            r'how old are you',
+            r'what.*your name',
+            
+            # Entertainment, sports, etc.
+            r'what.*movie',
+            r'who won.*game',
+            r'favorite.*food',
+            r'what.*color',
+            
+            # General knowledge unrelated to compliance
+            r'capital of.*country',
+            r'who is.*president',
+            r'when was.*born',
+        ]
+        
+        import re
+        for pattern in unrelated_patterns:
+            if re.search(pattern, question_lower):
+                return True
+        
+        return False
 
     def handle_query(self, request_data: GeneralChatbotRequest) -> dict:
         try:
@@ -98,13 +154,19 @@ class GeneralChatbotService(BaseOpenAIService):
                 print(f"{msg.role.upper()}: {msg.content}")
             print("================================\n")
 
-            prompt = self.generate_prompt(
-                request_data.chatHistory,
-                request_data.company_name,
-                request_data.tenant_details,
-                request_data.assigned_courses
-            )
-            response = self._make_openai_request(prompt)
+            current_question = request_data.chatHistory[-1].content if request_data.chatHistory else ""
+            
+            # Quick check for obviously unrelated questions
+            if self._is_clearly_unrelated_question(current_question):
+                response = "I'm here to help with questions about the ComplyQuick platform and your assigned courses. Could you please ask something related to your compliance training or platform usage?"
+            else:
+                prompt = self.generate_prompt(
+                    request_data.chatHistory,
+                    request_data.company_name,
+                    request_data.tenant_details,
+                    request_data.assigned_courses
+                )
+                response = self._make_openai_request(prompt)
             
             # Create updated chat history with the new response
             updated_chat_history = request_data.chatHistory + [
