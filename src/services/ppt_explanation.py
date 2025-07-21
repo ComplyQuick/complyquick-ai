@@ -71,7 +71,7 @@ class PPTExplanationService(BaseOpenAIService):
 
     
 
-    def _create_prompt(self, index: int, total_slides: int, slide_text: str, company_name: str, pocs: list, relevant_contacts: dict) -> str:
+    def _create_prompt(self, index: int, total_slides: int, slide_text: str, company_name: str, pocs: list, relevant_contacts: dict, org_details: str) -> str:
         """
         Create the appropriate prompt based on slide position and content.
         """
@@ -107,6 +107,17 @@ class PPTExplanationService(BaseOpenAIService):
 
         # Create a dynamic leadership section with varied language
         leadership_section = f"At {company_name}, we're proud to have " + ", ".join(role_introductions) + ". " + ", ".join(personalized_examples) + ". " + ", ".join(company_examples) + "."
+        
+        # Create organization context section incorporating the org_details
+        org_context_section = ""
+        if org_details and org_details.strip():
+            org_context_section = (
+                f"Organization Context: {org_details.strip()} "
+                f"Use this organizational information to make the explanation more relevant and personalized to {company_name}'s specific context, "
+                f"policies, values, and operational framework. Incorporate relevant details from the organization's background "
+                f"to make the training content more relatable and applicable to their specific workplace environment. "
+                f"Reference the company's specific practices, policies, or values mentioned in the org details when they relate to the slide content. "
+            )
 
         # CRITICAL: Add comprehensive coverage instruction for all slides
         comprehensive_instruction = (
@@ -139,6 +150,7 @@ class PPTExplanationService(BaseOpenAIService):
                 f"Write in a conversational tone that flows naturally when spoken aloud. "
                 f"Use smooth transitions and natural speech patterns. "
                 f"{leadership_section} "
+                f"{org_context_section} "
                 f"Emphasize how {company_name} is leading the way in this field. "
                 f"Incorporate specific examples of how our executives have championed this initiative. "
                 f"{comprehensive_instruction}\n\n"
@@ -157,6 +169,7 @@ class PPTExplanationService(BaseOpenAIService):
                 f"embody these principles in their daily work. "
                 f"Share a specific example of how {company_name} is implementing these practices. "
                 f"{leadership_section} "
+                f"{org_context_section} "
                 f"Don't use phrases like 'thank you for your time today'. "
                 f"{comprehensive_instruction}\n\n"
                 f"Slide content:\n{slide_text}"
@@ -217,6 +230,7 @@ class PPTExplanationService(BaseOpenAIService):
                 f"Break information into digestible chunks with natural pauses. "
                 f"{tone_instruction}"
                 f"{leadership_section} "
+                f"{org_context_section} "
                 f"Include specific examples of how {company_name} implements these practices, "
                 f"such as {role_examples_text}. "
                 f"Avoid using bullet points or lists - structure the content in flowing paragraphs. "
@@ -371,14 +385,14 @@ class PPTExplanationService(BaseOpenAIService):
         Process a single slide with explanation generation and verification.
         This method is designed to be used with concurrent processing.
         """
-        index, slide_text, total_slides, company_name, pocs = args
+        index, slide_text, total_slides, company_name, pocs, org_details = args
         
         try:
             logger.info(f"Processing slide {index + 1}/{total_slides}")
             
             # Step 1: Create prompt
             logger.debug(f"Creating prompt for slide {index + 1}")
-            prompt = self._create_prompt(index, total_slides, slide_text, company_name, pocs, {})
+            prompt = self._create_prompt(index, total_slides, slide_text, company_name, pocs, {}, org_details)
             
             # Step 2: Make OpenAI request
             logger.debug(f"Making OpenAI request for slide {index + 1}")
@@ -450,7 +464,7 @@ class PPTExplanationService(BaseOpenAIService):
             logger.error(f"Error processing slide {index + 1}: {str(e)}", exc_info=True)
             return index, f"Error generating explanation: {str(e)}"
 
-    def generate_explanations(self, slides_content: list, company_name: str, pocs: list):
+    def generate_explanations(self, slides_content: list, company_name: str, pocs: list, org_details: str):
         """
         Generate explanations for each slide using the OpenAI API with concurrent processing.
         """
@@ -472,7 +486,7 @@ class PPTExplanationService(BaseOpenAIService):
         logger.info(f"Using {max_workers} concurrent workers for processing")
         
         # Prepare arguments for concurrent processing
-        args_list = [(index, slide_text, total_slides, company_name, pocs) 
+        args_list = [(index, slide_text, total_slides, company_name, pocs, org_details) 
                     for index, slide_text in enumerate(slides_content)]
         
         explanations = [None] * total_slides  # Pre-allocate list
@@ -500,7 +514,7 @@ class PPTExplanationService(BaseOpenAIService):
         logger.info(f"Completed generating {len(explanations)} explanations with concurrent processing")
         return explanations
 
-    def process_ppt(self, presentation_url: str, company_name: str, pocs: list) -> list:
+    def process_ppt(self, presentation_url: str, company_name: str, pocs: list, org_details: str) -> list:
         """
         Process the PPT to extract content and generate explanations for each slide.
         """
@@ -509,7 +523,7 @@ class PPTExplanationService(BaseOpenAIService):
             # Use storage_service to download and get the file path
             ppt_path = self.storage_service.download_presentation(presentation_url)
             slides_content = self.extract_slide_content(ppt_path)
-            explanations = self.generate_explanations(slides_content, company_name, pocs)
+            explanations = self.generate_explanations(slides_content, company_name, pocs, org_details)
             
             result = []
             for i in range(len(slides_content)):

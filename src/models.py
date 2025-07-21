@@ -49,6 +49,7 @@ class ExplanationRequest(BaseModel):
     presentation_url: str  # Changed from s3_url to be more generic
     company_name: str
     pocs: List[POC]  # List of Points of Contact instead of tenant_details
+    org_details: str  # Organization details including company information, policies, etc.
 
 class SlideExplanation(BaseModel):
     """Model for slide explanations"""

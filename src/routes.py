@@ -105,7 +105,8 @@ async def generate_explanations(data: ExplanationRequest):
         explanations = ppt_explanation_service.process_ppt(
             data.presentation_url, 
             data.company_name,
-            [poc.dict() for poc in data.pocs]  # Convert POC models to dicts
+            [poc.dict() for poc in data.pocs],  # Convert POC models to dicts
+            data.org_details  # Pass organization details
         )
         logger.info(f"Generated {len(explanations)} explanations")
 
