@@ -19,28 +19,32 @@ class StorageService:
         ]
         self._initialize_google_credentials()
         
-        # Validate AWS credentials
-        aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
-        aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-        aws_region = os.getenv("AWS_REGION")
+        # Validate Linode Object Storage credentials
+        linode_access_key = os.getenv("LINODE_ACCESS_KEY")
+        linode_secret_key = os.getenv("LINODE_SECRET_KEY")
+        linode_region = os.getenv("LINODE_REGION")
+        linode_endpoint = os.getenv("LINODE_ENDPOINT")
+        self.bucket_name = os.getenv("LINODE_BUCKET_NAME")
+        self.audio_folder = os.getenv("LINODE_AUDIO_FOLDER", "test-uploads")  # Default to test-uploads
         
-        if not all([aws_access_key, aws_secret_key, aws_region]):
-            logger.error("Missing AWS credentials. Please check your environment variables.")
-            raise ValueError("AWS credentials not properly configured. Required: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION")
+        if not all([linode_access_key, linode_secret_key, linode_region, linode_endpoint, self.bucket_name]):
+            logger.error("Missing Linode Object Storage credentials. Please check your environment variables.")
+            raise ValueError("Linode credentials not properly configured. Required: LINODE_ACCESS_KEY, LINODE_SECRET_KEY, LINODE_REGION, LINODE_ENDPOINT, LINODE_BUCKET_NAME")
         
         try:
             self.s3_client = boto3.client(
                 's3',
-                aws_access_key_id=aws_access_key,
-                aws_secret_access_key=aws_secret_key,
-                region_name=aws_region
+                aws_access_key_id=linode_access_key,
+                aws_secret_access_key=linode_secret_key,
+                region_name=linode_region,
+                endpoint_url=linode_endpoint
             )
             # Test the credentials by making a simple S3 call
             self.s3_client.list_buckets()
-            logger.info("Successfully initialized AWS S3 client")
+            logger.info("Successfully initialized Linode Object Storage client")
         except Exception as e:
-            logger.error(f"Failed to initialize AWS S3 client: {str(e)}")
-            raise ValueError(f"Failed to initialize AWS S3 client: {str(e)}")
+            logger.error(f"Failed to initialize Linode Object Storage client: {str(e)}")
+            raise ValueError(f"Failed to initialize Linode Object Storage client: {str(e)}")
 
     def _initialize_google_credentials(self):
         """Initialize Google Drive credentials from environment variables"""
@@ -107,12 +111,12 @@ class StorageService:
             if 'docs.google.com' in presentation_url or 'drive.google.com' in presentation_url:
                 logger.info("Detected Google Drive URL")
                 return self._download_from_google_drive(presentation_url, download_path)
-            # Check if it's an S3 URL
-            elif 's3.' in presentation_url or '.amazonaws.com' in presentation_url:
-                logger.info("Detected S3 URL")
+            # Check if it's an S3 compatible URL (AWS S3 or Linode Object Storage)
+            elif 's3.' in presentation_url or '.amazonaws.com' in presentation_url or 'linodeobjects.com' in presentation_url:
+                logger.info("Detected S3-compatible URL (AWS S3 or Linode Object Storage)")
                 return self.download_ppt_from_s3(presentation_url, download_path)
             else:
-                raise ValueError(f"Unsupported URL format: {presentation_url}. Must be either Google Drive or S3 URL.")
+                raise ValueError(f"Unsupported URL format: {presentation_url}. Must be either Google Drive or S3-compatible URL.")
                 
         except Exception as e:
             logger.error(f"Error downloading presentation: {str(e)}", exc_info=True)
@@ -164,14 +168,21 @@ class StorageService:
 
     def download_ppt_from_s3(self, s3_url: str, download_path: str = "downloaded_presentation.pptx"):
         """
-        Download a PowerPoint file from the given S3 URL and save it locally.
+        Download a PowerPoint file from the given S3-compatible URL (AWS S3 or Linode Object Storage) and save it locally.
         """
         try:
-            logger.info(f"Attempting to download from S3: {s3_url}")
+            logger.info(f"Attempting to download from S3-compatible storage: {s3_url}")
             
-            # Parse the S3 URL
+            # Parse the S3-compatible URL
             parsed_url = urlparse(s3_url)
-            bucket_name = parsed_url.netloc.split('.')[0]
+            
+            # Try to extract bucket name from URL, but default to environment variable
+            if 'linodeobjects.com' in parsed_url.netloc:
+                # For Linode, use the bucket name from environment
+                bucket_name = self.bucket_name
+            else:
+                # For AWS S3, extract from URL
+                bucket_name = parsed_url.netloc.split('.')[0]
             
             # Fix double encoding issue
             key = parsed_url.path.lstrip('/')
@@ -180,7 +191,7 @@ class StorageService:
             # Then decode the remaining URL encoding
             key = unquote_plus(key)
             
-            logger.info(f"Parsed S3 URL - Bucket: {bucket_name}, Key: {key}")
+            logger.info(f"Parsed S3-compatible URL - Bucket: {bucket_name}, Key: {key}")
             
             # Check if bucket exists
             try:
@@ -190,7 +201,7 @@ class StorageService:
                 if error_code == '404':
                     raise Exception(f"Bucket '{bucket_name}' does not exist")
                 elif error_code == '403':
-                    raise Exception(f"Access denied to bucket '{bucket_name}'. Please check your AWS credentials and permissions.")
+                    raise Exception(f"Access denied to bucket '{bucket_name}'. Please check your storage credentials and permissions.")
                 else:
                     raise Exception(f"Error accessing bucket '{bucket_name}': {str(e)}")
 
@@ -202,7 +213,7 @@ class StorageService:
                 if error_code == '404':
                     raise Exception(f"File '{key}' not found in bucket '{bucket_name}'")
                 elif error_code == '403':
-                    raise Exception(f"Access denied to file '{key}' in bucket '{bucket_name}'. Please check your AWS credentials and permissions.")
+                    raise Exception(f"Access denied to file '{key}' in bucket '{bucket_name}'. Please check your storage credentials and permissions.")
                 else:
                     raise Exception(f"Error accessing file '{key}' in bucket '{bucket_name}': {str(e)}")
 
@@ -214,15 +225,15 @@ class StorageService:
             return download_path
             
         except self.s3_client.exceptions.NoSuchKey:
-            logger.error(f"File not found in S3: {key}", exc_info=True)
+            logger.error(f"File not found in storage: {key}", exc_info=True)
             raise Exception(f"The object '{key}' does not exist in bucket '{bucket_name}'.")
         except Exception as e:
-            logger.error(f"Error downloading from S3: {str(e)}", exc_info=True)
-            raise Exception(f"Failed to download file from S3: {str(e)}")
+            logger.error(f"Error downloading from storage: {str(e)}", exc_info=True)
+            raise Exception(f"Failed to download file from storage: {str(e)}")
 
     def extract_content_from_ppt(self, presentation_url: str):
         """
-        Extract text content from a PowerPoint file from either Google Drive or S3
+        Extract text content from a PowerPoint file from either Google Drive or S3-compatible storage
         """
         try:
             logger.info(f"Starting content extraction from presentation URL: {presentation_url}")
@@ -311,3 +322,100 @@ class StorageService:
         
         # Join all sections with clear separators
         return "\n\n" + "="*50 + "\n\n".join(knowledge_base)
+
+    def construct_audio_url(self, filename: str) -> str:
+        """
+        Construct a full URL for an audio file in the audio folder (test-uploads).
+        
+        Args:
+            filename (str): Name of the audio file
+            
+        Returns:
+            str: Full URL to the audio file
+        """
+        # Get the endpoint URL without trailing slash
+        endpoint = os.getenv("LINODE_ENDPOINT", "").rstrip('/')
+        
+        # Construct the full URL: endpoint/bucket/folder/filename
+        audio_url = f"{endpoint}/{self.bucket_name}/{self.audio_folder}/{filename}"
+        
+        logger.info(f"Constructed audio URL: {audio_url}")
+        return audio_url
+
+    def download_audio_file(self, filename: str, download_path: str = None) -> str:
+        """
+        Download an audio file from the audio folder (test-uploads) in Linode Object Storage.
+        
+        Args:
+            filename (str): Name of the audio file in the test-uploads folder
+            download_path (str): Local path to save the downloaded file
+            
+        Returns:
+            str: Path to the downloaded file
+        """
+        try:
+            logger.info(f"Downloading audio file from {self.audio_folder}: {filename}")
+            
+            # Construct the key (path in bucket)
+            key = f"{self.audio_folder}/{filename}"
+            
+            # Set default download path if not provided
+            if not download_path:
+                download_path = f"downloaded_{filename}"
+            
+            logger.info(f"Downloading from bucket: {self.bucket_name}, key: {key}")
+            
+            # Check if file exists
+            try:
+                self.s3_client.head_object(Bucket=self.bucket_name, Key=key)
+            except self.s3_client.exceptions.ClientError as e:
+                error_code = e.response['Error']['Code']
+                if error_code == '404':
+                    raise Exception(f"Audio file '{filename}' not found in {self.audio_folder} folder")
+                elif error_code == '403':
+                    raise Exception(f"Access denied to audio file '{filename}'. Check your credentials.")
+                else:
+                    raise Exception(f"Error accessing audio file: {str(e)}")
+            
+            # Download the file
+            self.s3_client.download_file(self.bucket_name, key, download_path)
+            logger.info(f"Successfully downloaded audio file to: {download_path}")
+            
+            return download_path
+            
+        except Exception as e:
+            logger.error(f"Error downloading audio file: {str(e)}", exc_info=True)
+            raise Exception(f"Failed to download audio file: {str(e)}")
+
+    def list_audio_files(self) -> list:
+        """
+        List all audio files in the audio folder (test-uploads).
+        
+        Returns:
+            list: List of audio filenames
+        """
+        try:
+            logger.info(f"Listing audio files in {self.audio_folder}")
+            
+            response = self.s3_client.list_objects_v2(
+                Bucket=self.bucket_name,
+                Prefix=f"{self.audio_folder}/"
+            )
+            
+            if 'Contents' not in response:
+                logger.info(f"No files found in {self.audio_folder}")
+                return []
+            
+            # Extract filenames (remove folder prefix)
+            files = [
+                obj['Key'].replace(f"{self.audio_folder}/", "")
+                for obj in response['Contents']
+                if not obj['Key'].endswith('/')  # Exclude folder itself
+            ]
+            
+            logger.info(f"Found {len(files)} audio files")
+            return files
+            
+        except Exception as e:
+            logger.error(f"Error listing audio files: {str(e)}", exc_info=True)
+            raise Exception(f"Failed to list audio files: {str(e)}")

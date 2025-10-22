@@ -26,10 +26,13 @@ Create a `.env` file in the project root:
 # OpenAI Configuration
 OPENAI_API_KEY=your_openai_api_key_here
 
-# AWS Configuration (for S3 storage)
-AWS_ACCESS_KEY_ID=your_aws_access_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret_key
-AWS_REGION=us-east-1
+# Linode Object Storage Configuration
+LINODE_ACCESS_KEY=your_linode_access_key
+LINODE_SECRET_KEY=your_linode_secret_key
+LINODE_REGION=in-maa
+LINODE_ENDPOINT=https://in-maa-1.linodeobjects.com
+LINODE_BUCKET_NAME=your_bucket_name
+LINODE_AUDIO_FOLDER=test-uploads  # Folder for audio files (default: test-uploads)
 
 # Google Cloud Configuration (if using Google services)
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
@@ -127,14 +130,17 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 ### Environment Variables
 
-| Variable                         | Description                    | Default    | Required |
-| -------------------------------- | ------------------------------ | ---------- | -------- |
-| `OPENAI_API_KEY`                 | OpenAI API key for AI services | -          | Yes      |
-| `AWS_ACCESS_KEY_ID`              | AWS access key for S3 storage  | -          | Yes      |
-| `AWS_SECRET_ACCESS_KEY`          | AWS secret key for S3 storage  | -          | Yes      |
-| `AWS_REGION`                     | AWS region                     | us-east-1  | No       |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Google Cloud credentials path  | -          | No       |
-| `ENVIRONMENT`                    | Deployment environment         | production | No       |
+| Variable                         | Description                              | Default                               | Required |
+| -------------------------------- | ---------------------------------------- | ------------------------------------- | -------- |
+| `OPENAI_API_KEY`                 | OpenAI API key for AI services           | -                                     | Yes      |
+| `LINODE_ACCESS_KEY`              | Linode access key for Object Storage     | -                                     | Yes      |
+| `LINODE_SECRET_KEY`              | Linode secret key for Object Storage     | -                                     | Yes      |
+| `LINODE_REGION`                  | Linode region                            | in-maa                                | Yes      |
+| `LINODE_ENDPOINT`                | Linode Object Storage endpoint           | https://in-maa-1.linodeobjects.com    | Yes      |
+| `LINODE_BUCKET_NAME`             | Linode bucket name                       | -                                     | Yes      |
+| `LINODE_AUDIO_FOLDER`            | Folder within bucket for audio files     | test-uploads                          | No       |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Google Cloud credentials path            | -                                     | No       |
+| `ENVIRONMENT`                    | Deployment environment                   | production                            | No       |
 
 ### Docker Compose Services
 

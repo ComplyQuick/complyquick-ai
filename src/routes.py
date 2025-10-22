@@ -70,6 +70,7 @@ async def root():
             "chatbot": "/chatbot",
             "general_chatbot": "/general-chatbot",
             "transcribe_audio": "/transcribe_audio",
+            "list_audio_files": "/list_audio_files",
             "enhance_slide": "/enhance-slide",
             "enhance_all_slides": "/enhance-all-slides",
             "get_enhancement_suggestions": "/get-enhancement-suggestions",
@@ -179,6 +180,36 @@ async def transcribe_audio(data: TranscriptionRequest):
                 os.remove(audio_path)
             except Exception as e:
                 logger.warning(f"Failed to clean up audio file: {str(e)}")
+
+@router.get("/list_audio_files")
+async def list_audio_files():
+    """
+    List all audio files available in the test-uploads folder
+    """
+    try:
+        logger.info("Received request to list audio files")
+        
+        # Get list of audio files from storage
+        audio_files = storage_service.list_audio_files()
+        
+        # Construct full URLs for each file
+        audio_files_with_urls = [
+            {
+                "filename": filename,
+                "url": storage_service.construct_audio_url(filename)
+            }
+            for filename in audio_files
+        ]
+        
+        return {
+            "audio_folder": storage_service.audio_folder,
+            "count": len(audio_files),
+            "files": audio_files_with_urls
+        }
+        
+    except Exception as e:
+        logger.error(f"Error listing audio files: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to list audio files: {str(e)}")
 
 @router.post("/enhance-slide", response_model=EnhancementResponse)
 async def enhance_slide(request: SlideEnhancementRequest):

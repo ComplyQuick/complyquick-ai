@@ -52,10 +52,13 @@ GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
 GOOGLE_REDIRECT_URI=http://localhost:8000/auth/callback
 
-# AWS Configuration (if using AWS services)
-AWS_ACCESS_KEY_ID=your_aws_access_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret_key
-AWS_REGION=your_aws_region
+# Linode Object Storage Configuration
+LINODE_ACCESS_KEY=your_linode_access_key
+LINODE_SECRET_KEY=your_linode_secret_key
+LINODE_REGION=your_linode_region
+LINODE_ENDPOINT=https://your-region.linodeobjects.com
+LINODE_BUCKET_NAME=your_bucket_name
+LINODE_AUDIO_FOLDER=test-uploads  # Folder within bucket where audio files are stored (default: test-uploads)
 ```
 
 Replace the placeholder values with your actual API keys and credentials.
