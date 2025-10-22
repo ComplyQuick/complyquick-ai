@@ -57,8 +57,8 @@ LINODE_ACCESS_KEY=your_linode_access_key
 LINODE_SECRET_KEY=your_linode_secret_key
 LINODE_REGION=your_linode_region
 LINODE_ENDPOINT=https://your-region.linodeobjects.com
-LINODE_BUCKET_NAME=your_bucket_name
-LINODE_AUDIO_FOLDER=test-uploads  # Folder within bucket where audio files are stored (default: test-uploads)
+LINODE_BUCKET_NAME=myaudiouploadbucket
+LINODE_AUDIO_FOLDER=audio  # Folder within bucket where audio files are stored (default: audio)
 ```
 
 Replace the placeholder values with your actual API keys and credentials.

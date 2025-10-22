@@ -25,7 +25,7 @@ class StorageService:
         linode_region = os.getenv("LINODE_REGION")
         linode_endpoint = os.getenv("LINODE_ENDPOINT")
         self.bucket_name = os.getenv("LINODE_BUCKET_NAME")
-        self.audio_folder = os.getenv("LINODE_AUDIO_FOLDER", "test-uploads")  # Default to test-uploads
+        self.audio_folder = os.getenv("LINODE_AUDIO_FOLDER", "audio")  # Default to audio folder
         
         if not all([linode_access_key, linode_secret_key, linode_region, linode_endpoint, self.bucket_name]):
             logger.error("Missing Linode Object Storage credentials. Please check your environment variables.")
@@ -180,12 +180,22 @@ class StorageService:
             if 'linodeobjects.com' in parsed_url.netloc:
                 # For Linode, use the bucket name from environment
                 bucket_name = self.bucket_name
+                
+                # For Linode URLs like: https://endpoint/bucket/path/file.ext
+                # We need to skip the bucket name in the path and get only: path/file.ext
+                path_parts = parsed_url.path.lstrip('/').split('/', 1)
+                if len(path_parts) > 1:
+                    # Skip the first part (bucket name in URL) and use the rest
+                    key = path_parts[1]
+                else:
+                    # No path after bucket name
+                    key = path_parts[0] if path_parts else ''
             else:
-                # For AWS S3, extract from URL
+                # For AWS S3, extract bucket from URL
                 bucket_name = parsed_url.netloc.split('.')[0]
+                key = parsed_url.path.lstrip('/')
             
             # Fix double encoding issue
-            key = parsed_url.path.lstrip('/')
             # First, decode %25 to % if it exists
             key = key.replace('%25', '%')
             # Then decode the remaining URL encoding

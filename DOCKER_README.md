@@ -31,8 +31,8 @@ LINODE_ACCESS_KEY=your_linode_access_key
 LINODE_SECRET_KEY=your_linode_secret_key
 LINODE_REGION=in-maa
 LINODE_ENDPOINT=https://in-maa-1.linodeobjects.com
-LINODE_BUCKET_NAME=your_bucket_name
-LINODE_AUDIO_FOLDER=test-uploads  # Folder for audio files (default: test-uploads)
+LINODE_BUCKET_NAME=myaudiouploadbucket
+LINODE_AUDIO_FOLDER=audio  # Folder for audio files (default: audio)
 
 # Google Cloud Configuration (if using Google services)
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
@@ -138,7 +138,7 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 | `LINODE_REGION`                  | Linode region                            | in-maa                                | Yes      |
 | `LINODE_ENDPOINT`                | Linode Object Storage endpoint           | https://in-maa-1.linodeobjects.com    | Yes      |
 | `LINODE_BUCKET_NAME`             | Linode bucket name                       | -                                     | Yes      |
-| `LINODE_AUDIO_FOLDER`            | Folder within bucket for audio files     | test-uploads                          | No       |
+| `LINODE_AUDIO_FOLDER`            | Folder within bucket for audio files     | audio                                 | No       |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Google Cloud credentials path            | -                                     | No       |
 | `ENVIRONMENT`                    | Deployment environment                   | production                            | No       |
 
